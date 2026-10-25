@@ -14,9 +14,11 @@ export async function embed(text, taskType) {
 
   let lastError;
   for (const key of config.geminiApiKeys) {
+    const masked = `${key.slice(0, 15)}...${key.slice(-4)}`;
     let response;
     try {
-      response = await fetch(endpoint, {
+      const url = `${endpoint}?key=${encodeURIComponent(key)}`;
+      response = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({
@@ -27,6 +29,7 @@ export async function embed(text, taskType) {
         })
       });
     } catch (error) {
+      console.warn(`[Embeddings] Network error with key ${masked}: ${error.message}`);
       lastError = error;
       continue;
     }
