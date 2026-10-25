@@ -11,6 +11,7 @@ import sessionRouter from './routes/session.js';
 import authRouter from './routes/auth.js';
 import projectsRouter from './routes/projects.js';
 import { startRealtime } from './services/realtime.js';
+import { ensureDatabaseSetup } from './scripts/setup.js';
 
 const app = express();
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -64,4 +65,11 @@ const port = Number(process.env.PORT || 3001);
 app.listen(port, () => {
   console.log(`Smaran.ai API listening on http://localhost:${port}`);
   startRealtime();
+  connect().then((database) => {
+    ensureDatabaseSetup(database, false).catch((err) => {
+      console.warn(`Initial database indexing warning: ${err.message}`);
+    });
+  }).catch((err) => {
+    console.warn(`Initial database connection warning: ${err.message}`);
+  });
 });

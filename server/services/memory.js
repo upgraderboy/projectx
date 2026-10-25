@@ -31,14 +31,24 @@ const actorFields = (actor = {}, projectId) => ({
 export async function recall(query, { projectId }) {
   await connect();
   const vector = await embed(query, 'RETRIEVAL_QUERY');
-  const results = await memories.aggregate([
-    { $vectorSearch: {
-      index: 'memory_vector', path: 'embedding', queryVector: vector,
-      numCandidates: 100, limit: 8,
-      filter: { projectId: String(projectId), status: 'active' }
-    } },
-    { $addFields: { similarity: { $meta: 'vectorSearchScore' } } }
-  ]).toArray();
+  let results = [];
+  try {
+    results = await memories.aggregate([
+      { $vectorSearch: {
+        index: 'memory_vector', path: 'embedding', queryVector: vector,
+        numCandidates: 100, limit: 8,
+        filter: { projectId: String(projectId), status: 'active' }
+      } },
+      { $addFields: { similarity: { $meta: 'vectorSearchScore' } } }
+    ]).toArray();
+  } catch (error) {
+    console.warn(`Vector search unavailable (falling back to recent active memories): ${error.message}`);
+    const fallbackMemories = await memories.find({ projectId: String(projectId), status: 'active' })
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .toArray();
+    results = fallbackMemories.map((m) => ({ ...m, similarity: 0.95 }));
+  }
 
   const timestamp = now();
   const ranked = results

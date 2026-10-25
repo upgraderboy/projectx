@@ -11,7 +11,7 @@ async function ensureCollection(database, name) {
   } else console.log(`Collection exists: ${name}`);
 }
 
-async function ensureVectorIndex(collection) {
+export async function ensureVectorIndex(collection, waitQueryable = true) {
   let indexes = await collection.listSearchIndexes().toArray();
   let index = indexes.find(({ name }) => name === 'memory_vector');
   if (!index) {
@@ -29,6 +29,7 @@ async function ensureVectorIndex(collection) {
     });
   } else console.log('Vector index exists: memory_vector');
 
+  if (!waitQueryable) return;
   const deadline = Date.now() + 10 * 60 * 1000;
   while (Date.now() < deadline) {
     indexes = await collection.listSearchIndexes().toArray();
@@ -42,8 +43,7 @@ async function ensureVectorIndex(collection) {
   throw new Error('Timed out waiting for Atlas Vector Search index "memory_vector" to become queryable.');
 }
 
-try {
-  const database = await connect();
+export async function ensureDatabaseSetup(database, waitQueryable = false) {
   for (const name of ['users', 'projects', 'memberships', 'invites', 'memories', 'messages', 'memory_events']) await ensureCollection(database, name);
 
   await database.collection('users').createIndex({ email: 1 }, { unique: true, name: 'users_email_unique' });
@@ -63,11 +63,18 @@ try {
   await database.collection('messages').createIndex({ sessionId: 1, createdAt: 1 }, { name: 'messages_session_createdAt' });
   console.log('TTL and normal indexes are ready.');
 
-  await ensureVectorIndex(memoryCollection);
-  console.log('Setup complete: memory_vector is queryable.');
-} catch (error) {
-  console.error(`Setup failed: ${error.message}`);
-  process.exitCode = 1;
-} finally {
-  await dbClient.close().catch(() => {});
+  await ensureVectorIndex(memoryCollection, waitQueryable);
+  console.log('Setup complete: memory_vector index configured.');
+}
+
+if (process.argv[1]?.endsWith('setup.js')) {
+  try {
+    const database = await connect();
+    await ensureDatabaseSetup(database, true);
+  } catch (error) {
+    console.error(`Setup failed: ${error.message}`);
+    process.exitCode = 1;
+  } finally {
+    await dbClient.close().catch(() => {});
+  }
 }
