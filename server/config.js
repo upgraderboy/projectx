@@ -21,7 +21,7 @@ if (jwtSecret.length < 32) {
 }
 
 export const config = Object.freeze({
-  mongodbUri: required('MONGODB_URI'),
+  mongodbUri: process.env.smaran_MONGODB_URI?.trim() || process.env.MONGODB_URI?.trim() || required('MONGODB_URI'),
   dbName: required('DB_NAME'),
   jwtSecret,
   appUrl: process.env.APP_URL?.trim() || 'http://localhost:5173',
